@@ -1,0 +1,1 @@
+ffmpeg -i '' -ss -c: copy ''.pt000.''
