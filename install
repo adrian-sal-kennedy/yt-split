@@ -1,0 +1,8 @@
+#!/bin/bash
+sudo rm /usr/local/bin/yt-split /usr/local/bin/getTags /usr/local/bin/fpcurl /usr/local/bin/split-by-silence /usr/local/bin/fingerprint 
+
+sudo ln -s "${PWD}/yt-split" /usr/local/bin/
+sudo ln -s "${PWD}/getTags" /usr/local/bin/
+sudo ln -s "${PWD}/fpcurl" /usr/local/bin/
+sudo ln -s "${PWD}/split-by-silence" /usr/local/bin/
+sudo ln -s "${PWD}/fingerprint" /usr/local/bin/
