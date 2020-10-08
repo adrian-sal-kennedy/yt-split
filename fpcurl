@@ -1,2 +1,0 @@
-#!/bin/bash
-fpcalc "$1" | awk -F'=' '/DURATION/ {dur=$2} /FINGERPRINT/ {fingerprint=$2} END{print "curl -F \"client=whUpfZZrMt\" -F \"meta=recordings\" -F \"duration=" dur "\" -F \"fingerprint=" fingerprint "\" \"https://api.acoustid.org/v2/lookup\""}' | bash && echo

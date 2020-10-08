@@ -1,0 +1,8 @@
+#!/bin/bash
+file=$1
+# json=$(fingerprint "${file}")
+[[ -f "${file}.json" ]] || fingerprint "${file}" > "${file}.json"
+echo getTags \"${file}.json\" \"${file}\" \| bash
+[[ ! $(jq '.results' "${file}.json") == "null" ]] && getTags "${file}.json" "${file}" | bash
+
+# rm "${file}.json"
