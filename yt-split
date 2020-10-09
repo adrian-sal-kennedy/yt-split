@@ -27,10 +27,9 @@ awky='BEGIN{ partnumber=0} /^[0-9]/ { a= $1; if(b!="") printf "echo ffmpeg -i ${
 if [[ ! -z $(cat "$file" | jq '.description' | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}') ]]
 then
   cat "$file" | jq '.description' | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}' | awk "$awky" | filename=\"${media}\" bash > "${media%.*}.list"
-  bash "${media%.*}.list"
+  bash "${media%.*}.list" && rm "${media%.*}.list"
 else
   echo "splitting by silence..."
   split-by-silence "${media}" -96
 fi
 find -iname "${media%.*}.pt*" | sort | while read file; do echo "$file"; autotag "$file"; done
-#cat "${media%.*}.list" | while read file; do echo fpcurl $(echo $file | awk -F"'" '/.pt/ {printf "\"%1s\"\n",$4 }'); done

@@ -99,13 +99,14 @@ const ffmpegCli = (tags) => {
     string += `-metadata ${e[0]}="${e[1]}" `;
   });
   // return `ffmpeg -i "${filename}" -c: copy ${string} "./${tags.ARTIST} - ${tags.ORIGINALYEAR} - ${tags.ALBUM}/${filename.split(".").slice(0, -1).join(".")}.tagged.opus"`;
-  return `mkdir -p "./${tags.ARTIST} - ${tags.ORIGINALYEAR} - ${
-    tags.ALBUM
-  }" && ffmpeg -i "${filename}" -map_metadata -1 -c:a copy ${string} "./${tags.ARTIST} - ${
+  return `mkdir -p "./${tags.ARTIST.toString().replace(/[\\|/]/g,"_")} - ${tags.ORIGINALYEAR} - ${
+    tags.ALBUM.toString().replace(/[\\|/]/g,"_")
+  }" && ffmpeg -i "${filename}" -map_metadata -1 -c:a copy ${string} "./${tags.ARTIST.toString().replace(/[\\|/]/g,"_")} - ${
     tags.ORIGINALYEAR
-  } - ${tags.ALBUM}/${tags.disc}.${("000" + tags.track).slice(-2)} - ${
-    tags.TITLE
+  } - ${tags.ALBUM.toString().replace(/[\\|/]/g,"_")}/${tags.disc}.${("000" + tags.track.toString().replace(/[\\|/]/g,"_")).slice(-2)} - ${
+    tags.TITLE.toString().replace(/[\\|/]/g,"_")
   }.${ext}" && rm "${filename}"`;
 };
 
 console.log(ffmpegCli(getEarliestRelease(results)));
+// .toString().replace(/[\\|/]/g,"_")
