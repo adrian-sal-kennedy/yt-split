@@ -13,6 +13,7 @@ const applyTags = (album) => {
   earliestRecord.disc = album.mediums[0].position;
   earliestRecord.tracknumber = earliestRecord.track =
     album.mediums[0].tracks[0].position;
+  earliestRecord.TRACKTOTAL = album.track_count;
   earliestRecord.title = earliestRecord.TITLE =
     album.mediums[0].tracks[0].title;
   earliestRecord.MUSICBRAINZ_ALBUMARTISTID = album.artists[0].id;
@@ -85,6 +86,7 @@ const getEarliestRelease = (results) => {
         applyTags(album);
       }
     }
+    // console.log(JSON.stringify(album))
   });
   delete earliestRecord.epoch;
   return earliestRecord;
