@@ -1,89 +1,123 @@
 #!/usr/bin/env node
-// const { results } = JSON.parse(process.argv.slice(2).flat()[0]);
 const fs = require("fs");
 const { results } = JSON.parse(
   fs.readFileSync(process.argv.slice(2).flat()[0])
 );
 const filename = `${process.argv.slice(2).flat()[1]}`;
 
+var earliestRecord = {};
+
+const applyTags = (album) => {
+  earliestRecord.artist = earliestRecord.ARTIST = album.artists[0].name;
+  earliestRecord.album = earliestRecord.ALBUM = album.title;
+  earliestRecord.disc = album.mediums[0].position;
+  earliestRecord.tracknumber = earliestRecord.track =
+    album.mediums[0].tracks[0].position;
+  earliestRecord.title = earliestRecord.TITLE =
+    album.mediums[0].tracks[0].title;
+  earliestRecord.MUSICBRAINZ_ALBUMARTISTID = album.artists[0].id;
+  earliestRecord.MUSICBRAINZ_TRACKID = album.mediums[0].tracks[0].id;
+};
+
+const eachIfDefined = (arr, cb) => {
+  if (Array.isArray(arr) && typeof arr !== "undefined") {
+    arr.forEach(cb);
+  } else {
+    return null;
+  }
+};
+
 const getEarliestRelease = (results) => {
-  var earliestRecord = {};
-  results.forEach((result) => {
-    if (typeof result.recordings !== "undefined") {
-      result.recordings.forEach((recording, idx) => {
-        if (typeof recording.releases !== "undefined") {
-          recording.releases.forEach((release) => {
-            if ("date" in release && "day" in release.date) {
-              let date = `${("000" + release.date.year).slice(-4)}-${(
-                "0" + release.date.month
-              ).slice(-2)}-${("0" + release.date.day).slice(-2)}`;
-              let dateObj = Date.parse(date);
-              if ("epoch" in earliestRecord) {
-                if (dateObj < earliestRecord.epoch) {
-                  earliestRecord.ARTIST = recording.artists[0].name;
-                  earliestRecord.ALBUM = release.title;
-                  earliestRecord.disc = release.mediums[0].position;
-                  earliestRecord.track = release.mediums[0].tracks[0].position;
-                  earliestRecord.TITLE = recording.title;
-                  earliestRecord.MUSICBRAINZ_TRACKID = result.recordings[0].id;
-                  earliestRecord.ORIGINALDATE = `${(
-                    "000" + release.date.year
-                  ).slice(-4)}-${("0" + release.date.month).slice(-2)}-${(
-                    "0" + release.date.day
-                  ).slice(-2)}`;
-                  earliestRecord.ORIGINALYEAR = `${(
-                    "000" + release.date.year
-                  ).slice(-4)}`;
-                  earliestRecord.album_artist = release.artists[0].name;
-                  earliestRecord.MUSICBRAINZ_ALBUMARTISTID =
-                    release.artists[0].id;
-                  earliestRecord.ACOUSTID_ID = result.id;
-                  earliestRecord.epoch = Date.parse(
-                    earliestRecord.ORIGINALDATE
-                  );
-                }
-              } else {
-                earliestRecord.ARTIST = recording.artists[0].name;
-                earliestRecord.ALBUM = release.title;
-                earliestRecord.disc = release.mediums[0].position;
-                earliestRecord.track = release.mediums[0].tracks[0].position;
-                earliestRecord.TITLE = recording.title;
-                earliestRecord.MUSICBRAINZ_TRACKID = result.recordings[0].id;
-                earliestRecord.ORIGINALDATE = `${(
-                  "000" + release.date.year
-                ).slice(-4)}-${("0" + release.date.month).slice(-2)}-${(
-                  "0" + release.date.day
-                ).slice(-2)}`;
-                earliestRecord.ORIGINALYEAR = `${(
-                  "000" + release.date.year
-                ).slice(-4)}`;
-                earliestRecord.album_artist = release.artists[0].name;
-                earliestRecord.MUSICBRAINZ_ALBUMARTISTID =
-                  release.artists[0].id;
-                earliestRecord.ACOUSTID_ID = result.id;
-                earliestRecord.epoch = Date.parse(earliestRecord.ORIGINALDATE);
-              }
-            }
-          });
+  var albums = [];
+  // get only first result - they are returned by acoustID
+  // in order of best score, so there's a chance a bad score
+  // will give a "better" result which will give the wrong title.
+  //
+  // get all releases of type: "album"
+  earliestRecord.ACOUSTID_ID = results[0].id;
+  eachIfDefined(results[0].recordings, (recording) => {
+    eachIfDefined(recording.releasegroups, (releasegroup) => {
+      if (releasegroup.type.toLowerCase() == "album") {
+        // albums.push(releasegroup.releases);
+        eachIfDefined(releasegroup.releases, (release) => {
+          if (release.date) {
+            albums.push(release);
+          }
+        });
+      }
+    });
+  });
+  albums.forEach((album) => {
+    // get earliest date.
+    // some dates are only a year, so we first
+    // check if there's a "day".
+    if ("day" in album.date) {
+      let date = `${("000" + album.date.year).slice(-4)}-${(
+        "0" + album.date.month
+      ).slice(-2)}-${("0" + album.date.day).slice(-2)}`;
+      let dateObj = Date.parse(date);
+      if ("epoch" in earliestRecord) {
+        if (dateObj < earliestRecord.epoch) {
+          // apply all the tags
+          earliestRecord.date = earliestRecord.ORIGINALDATE = `${(
+            "000" + album.date.year
+          ).slice(-4)}-${("0" + album.date.month).slice(-2)}-${(
+            "0" + album.date.day
+          ).slice(-2)}`;
+          earliestRecord.year = earliestRecord.ORIGINALYEAR = `${(
+            "000" + album.date.year
+          ).slice(-4)}`;
+          earliestRecord.epoch = Date.parse(earliestRecord.ORIGINALDATE);
+          applyTags(album);
+          // console.log(JSON.stringify(album));
         }
-      });
+      } else {
+        // apply all the tags
+        earliestRecord.date = earliestRecord.ORIGINALDATE = `${(
+          "000" + album.date.year
+        ).slice(-4)}-${("0" + album.date.month).slice(-2)}-${(
+          "0" + album.date.day
+        ).slice(-2)}`;
+        earliestRecord.year = earliestRecord.ORIGINALYEAR = `${(
+          "000" + album.date.year
+        ).slice(-4)}`;
+        earliestRecord.epoch = Date.parse(earliestRecord.ORIGINALDATE);
+        applyTags(album);
+      }
     }
   });
+  delete earliestRecord.epoch;
   return earliestRecord;
 };
 
 const ffmpegCli = (tags) => {
-  ext = filename.match(/.*\.(.*)$/)[1]
+  ext = filename.match(/.*\.(.*)$/)[1];
   string = "";
   Object.entries(tags).forEach((e) => {
     string += `-metadata ${e[0]}="${e[1]}" `;
   });
   // return `ffmpeg -i "${filename}" -c: copy ${string} "./${tags.ARTIST} - ${tags.ORIGINALYEAR} - ${tags.ALBUM}/${filename.split(".").slice(0, -1).join(".")}.tagged.opus"`;
-  return `mkdir -p "./${tags.ARTIST} - ${tags.ORIGINALYEAR} - ${tags.ALBUM}" && ffmpeg -i "${filename}" -c: copy ${string} "./${tags.ARTIST} - ${tags.ORIGINALYEAR} - ${tags.ALBUM}/${tags.disc}.${("000" + tags.track).slice(-2)} - ${tags.TITLE}.${ext}" && rm "${filename}"`
+  return `mkdir -p "./${tags.ARTIST} - ${tags.ORIGINALYEAR} - ${
+    tags.ALBUM
+  }" && ffmpeg -i "${filename}" -c: copy ${string} "./${tags.ARTIST} - ${
+    tags.ORIGINALYEAR
+  } - ${tags.ALBUM}/${tags.disc}.${("000" + tags.track).slice(-2)} - ${
+    tags.TITLE
+  }.${ext}" && rm "${filename}"`;
 };
 
 console.log(ffmpegCli(getEarliestRelease(results)));
-// console.log(JSON.stringify(results[0].recordings[0].releases[0]));
+// console.log(getEarliestRelease(results));
+// console.log(
+//   eachIfDefined(results, (result) => {
+//     console.log(result);
+//   })
+// );
+// console.log(
+//   results.forEach((result) => {
+//     console.log(result);
+//   })
+// );
 
 // encoder         : Lavf58.59.100
 // epoch           : 298252800000
