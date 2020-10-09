@@ -99,7 +99,7 @@ const ffmpegCli = (tags) => {
   // return `ffmpeg -i "${filename}" -c: copy ${string} "./${tags.ARTIST} - ${tags.ORIGINALYEAR} - ${tags.ALBUM}/${filename.split(".").slice(0, -1).join(".")}.tagged.opus"`;
   return `mkdir -p "./${tags.ARTIST} - ${tags.ORIGINALYEAR} - ${
     tags.ALBUM
-  }" && ffmpeg -i "${filename}" -c: copy ${string} "./${tags.ARTIST} - ${
+  }" && ffmpeg -i "${filename}" -map_metadata -1 -c:a copy ${string} "./${tags.ARTIST} - ${
     tags.ORIGINALYEAR
   } - ${tags.ALBUM}/${tags.disc}.${("000" + tags.track).slice(-2)} - ${
     tags.TITLE
