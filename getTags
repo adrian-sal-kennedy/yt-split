@@ -136,7 +136,8 @@ const getEarliestRelease = (results) => {
   });
   delete earliestRecord.epoch;
   delete earliestRecord.errors;
-  return earliestRecord;
+  // return earliestRecord;
+  return albums;
 };
 
 const ffmpegCli = (tags) => {
@@ -165,8 +166,8 @@ const ffmpegCli = (tags) => {
   )}.${ext}" && rm "${filename}"`;
 };
 
-console.log(ffmpegCli(getEarliestRelease(results)));
-// console.log(getEarliestRelease(results));
+// console.log(ffmpegCli(getEarliestRelease(results)));
+console.log(getEarliestRelease(results));
 
 //const earliest = getEarliestRelease(results);
 //console.log(JSON.stringify(albums));
