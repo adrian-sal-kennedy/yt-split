@@ -45,20 +45,23 @@ const getEarliestRelease = (results) => {
   // set date to RIGHT THIS MILLISECOND. it can only get older from here.
 
   results.forEach((result)=> {
-    earliestRecord.ACOUSTID_ID = result.id;
-    eachIfDefined(result.recordings, (recording) => {
-      //earliestRecord.artist = earliestRecord.ARTIST = recording.artists[0].name;
-      eachIfDefined(recording.releasegroups, (releasegroup) => {
-        if (releasegroup.type === "Album") {
-          // albums.push(releasegroup.releases);
-          eachIfDefined(releasegroup.releases, (release) => {
-            if (release.date) {
-              albums.push(release);
-            }
-          });
-        }
+    earliestRecord.score = result.score;
+    if (result.score < 0.95) {
+      earliestRecord.ACOUSTID_ID = result.id;
+      eachIfDefined(result.recordings, (recording) => {
+        //earliestRecord.artist = earliestRecord.ARTIST = recording.artists[0].name;
+        eachIfDefined(recording.releasegroups, (releasegroup) => {
+          if (releasegroup.type === "Album") {
+            // albums.push(releasegroup.releases);
+            eachIfDefined(releasegroup.releases, (release) => {
+              if (release.date) {
+                albums.push(release);
+              }
+            });
+          }
+        });
       });
-    });
+    }
   });
 
   albums.forEach((album) => {

@@ -8,9 +8,9 @@ url=$1
 
 if [[ "${url##*.}" == "json" ]]
 then
-    filename=$(cat "${url}" | jq '._filename')
+filename=$(cat "${url}" | jq '._filename')
 else
-    filename=$(youtube-dl --print-json --add-metadata --write-info-json -x "${url}" | jq '._filename')
+filename=$(youtube-dl --print-json --add-metadata --write-info-json -x "${url}" | jq '._filename')
 fi
 
 file=$(sed -e 's/^"//' -e 's/"$//' <<<$filename) # remove quotes returned by jq
@@ -26,10 +26,22 @@ awky='BEGIN{ partnumber=0} /^[0-9]/ { a= $1; if(b!="") printf "echo ffmpeg -i ${
 
 if [[ ! -z $(cat "$file" | jq '.description' | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}') ]]
 then
-  cat "$file" | jq '.description' | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}' | awk "$awky" | filename=\"${media}\" bash > "${media%.*}.list"
-  bash "${media%.*}.list" && rm "${media%.*}.list"
+cat "$file" | jq '.description' | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}' | awk "$awky" | filename=\"${media}\" bash > "${media%.*}.list"
+bash "${media%.*}.list" && rm "${media%.*}.list"
 else
-  echo "splitting by silence..."
-  split-by-silence "${media}" -96
+googresponse=$(curl "https://www.googleapis.com/youtube/v3/commentThreads?key=$(google-api-key)&textFormat=plainText&part=snippet&videoId=$(cat "$file" | jq -r '.id')&maxRes" | jq '.items[0].snippet.topLevelComment.snippet.textOriginal')
+if [[ ! -z $(echo $googresponse | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}') ]]
+then
+echo $googresponse | sed 's/\\n/\n/g'
+echo $googresponse | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}' | awk "$awky" | filename=\"${media}\" bash > "${media%.*}.list"
+bash "${media%.*}.list" && rm "${media%.*}.list"
+else
+echo "splitting by silence..."
+split-by-silence "${media}" -96
+fi
 fi
 find -iname "${media%.*}.pt*" | sort | while read file; do echo "$file"; autotag "$file"; done
+
+#cat samplecomments.json | jq '.items[0].snippet.topLevelComment.snippet.textOriginal' | sed 's/\\n/\n/g'
+
+#curl "https://www.googleapis.com/youtube/v3/commentThreads?key=$(google-api-key)&textFormat=plainText&part=snippet&videoId=6fQ28dTEUd0&maxRes" > samplecomments.json
