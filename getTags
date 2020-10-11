@@ -33,10 +33,12 @@ const eachIfDefined = (arr, cb) => {
   }
 };
 
-var albums = {};
-albums.releases = [];
-albums.indices = [];
-albums.scores = [];
+var albums = {
+  releases: [],
+  polling: {},
+  bestName: "",
+  acc: 0,
+};
 
 const getEarliestRelease = (results) => {
   // get only first result - they are returned by acoustID
@@ -50,6 +52,8 @@ const getEarliestRelease = (results) => {
   results.forEach((result, i0) => {
     earliestRecord.score = result.score;
     // it was about at this point that I noticed that sometimes people enter the wrong damn details into AcoustID, and so one song might have an earlier date than the rest of it's cohort AND it may have a high similarity score. There's no shortcuts unfortunately.
+    // the ultimate solution would be to run getTags on the entire list at once, but there are plenty of reasons not to do this.
+    // taking a vote on the song names should work 99% of the time, and this is an edge case already. Whatevs, I'm doing this to learn on messy data.
 
     earliestRecord.ACOUSTID_ID = result.id;
     eachIfDefined(result.recordings, (recording, i1) => {
@@ -59,14 +63,19 @@ const getEarliestRelease = (results) => {
           // albums.push(releasegroup.releases);
           eachIfDefined(releasegroup.releases, (release, i3) => {
             if (release.date) {
-              albums.releases.push(release);
-              albums.indices.push({
-                results: i0,
-                recordings: i1,
-                releasegroups: i2,
-                release: i3,
+              albums.releases.push({
+                release: release,
+                stats: {
+                  results: i0,
+                  recordings: i1,
+                  releasegroups: i2,
+                  release: i3,
+                  score: result.score,
+                },
               });
-              albums.scores.push(result.score);
+              albums.polling[`${release.mediums[0].tracks[0].title}`]
+                ? (albums.polling[`${release.mediums[0].tracks[0].title}`] += 1)
+                : (albums.polling[`${release.mediums[0].tracks[0].title}`] = 1);
             }
           });
         }
@@ -74,70 +83,83 @@ const getEarliestRelease = (results) => {
     });
   });
 
-  albums.releases.forEach((album) => {
-    // get earliest date.
-    // some dates are only a year, so we first
-    // check if there's a "day".
-    if ("day" in album.date) {
-      delete earliestRecord.errors.day;
-      delete earliestRecord.errors.month;
-      delete earliestRecord.errors.year;
-      let date = `${("000" + album.date.year).slice(-4)}-${(
-        "0" + album.date.month
-      ).slice(-2)}-${("0" + album.date.day).slice(-2)}`;
-      let dateObj = Date.parse(date);
+  Object.values(albums.polling).forEach((count, idx) => {
+    // find the title that came up most often, in case there are several (alt titles or just wrong acoustid entries)
+    if (count > albums.acc) {
+      albums.bestName = Object.keys(albums.polling)[idx];
+      albums.acc = count;
+    }
+  });
 
-      if (dateObj < earliestRecord.epoch) {
-        // apply all the tags
-        earliestRecord.date = earliestRecord.ORIGINALDATE = `${(
-          "000" + album.date.year
-        ).slice(-4)}-${("0" + album.date.month).slice(-2)}-${(
-          "0" + album.date.day
-        ).slice(-2)}`;
-        earliestRecord.year = earliestRecord.ORIGINALYEAR = `${(
-          "000" + album.date.year
-        ).slice(-4)}`;
-        earliestRecord.epoch = Date.parse(earliestRecord.ORIGINALDATE);
-        applyTags(album);
-        // console.log(JSON.stringify(album));
-      }
-    } else {
-      earliestRecord.errors.day = "no day";
-      if ("month" in album.date) {
-        // no day. go by month and add one month for calculations
+  albums.releases.forEach((album) => {
+    // pick the title that comes up most in "polling"
+    if (album.release.mediums[0].tracks[0].title == albums.bestName) {
+      // stuff goes here
+      // get earliest date.
+      // some dates are only a year, so we first
+      // check if there's a "day".
+      if ("day" in album.release.date) {
+        delete earliestRecord.errors.day;
         delete earliestRecord.errors.month;
         delete earliestRecord.errors.year;
-        testEpoch = Date.parse(
-          `${album.year}-${album.month + 1 < 12 ? album.month + 1 : "12-31"}`
-        );
-        if (testEpoch < earliestRecord.epoch) {
-          earliestRecord.epoch = testEpoch;
-          earliestRecord.ORIGINALYEAR = earliestRecord.ORIGINALDATE = earliestRecord.year = earliestRecord.date =
-            album.date.year;
-          ///Date.parse(earliestRecord.ORIGINALDATE);
-          applyTags(album);
+        let date = `${("000" + album.release.date.year).slice(-4)}-${(
+          "0" + album.release.date.month
+        ).slice(-2)}-${("0" + album.release.date.day).slice(-2)}`;
+        let dateObj = Date.parse(date);
+
+        if (dateObj < earliestRecord.epoch) {
+          // apply all the tags
+          earliestRecord.date = earliestRecord.ORIGINALDATE = `${(
+            "000" + album.release.date.year
+          ).slice(-4)}-${("0" + album.release.date.month).slice(-2)}-${(
+            "0" + album.release.date.day
+          ).slice(-2)}`;
+          earliestRecord.year = earliestRecord.ORIGINALYEAR = `${(
+            "000" + album.release.date.year
+          ).slice(-4)}`;
+          earliestRecord.epoch = Date.parse(earliestRecord.ORIGINALDATE);
+          applyTags(album.release);
+          // console.log(JSON.stringify(album));
         }
       } else {
-        // go by year, add a year and subtract a millisec for mafs
-        delete earliestRecord.errors.year;
-        earliestRecord.errors.month = "no month";
-        testEpoch = Date.parse(`${album.year + 1}`) - 1;
-        if (testEpoch < earliestRecord.epoch) {
-          earliestRecord.epoch = testEpoch;
-          earliestRecord.ORIGINALYEAR = earliestRecord.ORIGINALDATE = earliestRecord.year = earliestRecord.date =
-            album.date.year;
-          ///Date.parse(earliestRecord.ORIGINALDATE);
-          applyTags(album);
+        earliestRecord.errors.day = "no day";
+        if ("month" in album.release.date) {
+          // no day. go by month and add one month for calculations
+          delete earliestRecord.errors.month;
+          delete earliestRecord.errors.year;
+          testEpoch = Date.parse(
+            `${album.release.year}-${
+              album.release.month + 1 < 12 ? album.release.month + 1 : "12-31"
+            }`
+          );
+          if (testEpoch < earliestRecord.epoch) {
+            earliestRecord.epoch = testEpoch;
+            earliestRecord.ORIGINALYEAR = earliestRecord.ORIGINALDATE = earliestRecord.year = earliestRecord.date =
+              album.release.date.year;
+            ///Date.parse(earliestRecord.ORIGINALDATE);
+            applyTags(album.release);
+          }
+        } else {
+          // go by year, add a year and subtract a millisec for mafs
+          delete earliestRecord.errors.year;
+          earliestRecord.errors.month = "no month";
+          testEpoch = Date.parse(`${album.release.year + 1}`) - 1;
+          if (testEpoch < earliestRecord.epoch) {
+            earliestRecord.epoch = testEpoch;
+            earliestRecord.ORIGINALYEAR = earliestRecord.ORIGINALDATE = earliestRecord.year = earliestRecord.date =
+              album.release.date.year;
+            ///Date.parse(earliestRecord.ORIGINALDATE);
+            applyTags(album.release);
+          }
         }
       }
+      // console.log(earliestRecord.epoch)
+      // console.log(JSON.stringify(album))
     }
-    // console.log(earliestRecord.epoch)
-    // console.log(JSON.stringify(album))
   });
   delete earliestRecord.epoch;
   delete earliestRecord.errors;
-  // return earliestRecord;
-  return albums;
+  return earliestRecord;
 };
 
 const ffmpegCli = (tags) => {
@@ -166,8 +188,8 @@ const ffmpegCli = (tags) => {
   )}.${ext}" && rm "${filename}"`;
 };
 
-// console.log(ffmpegCli(getEarliestRelease(results)));
-console.log(getEarliestRelease(results));
+console.log(ffmpegCli(getEarliestRelease(results)));
+// console.log(JSON.stringify(getEarliestRelease(results)));
 
 //const earliest = getEarliestRelease(results);
 //console.log(JSON.stringify(albums));
