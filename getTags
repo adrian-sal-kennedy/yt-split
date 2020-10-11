@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 const fs = require("fs");
-const { results } = JSON.parse(
+const {
+  results
+} = JSON.parse(
   fs.readFileSync(process.argv.slice(2).flat()[0])
 );
 const filename = `${process.argv.slice(2).flat()[1]}`;
@@ -16,10 +18,10 @@ const applyTags = (album) => {
   earliestRecord.album = earliestRecord.ALBUM = album.title;
   earliestRecord.disc = album.mediums[0].position;
   earliestRecord.tracknumber = earliestRecord.track =
-    album.mediums[0].tracks[0].position;
+  album.mediums[0].tracks[0].position;
   earliestRecord.TRACKTOTAL = album.track_count;
   earliestRecord.title = earliestRecord.TITLE =
-    album.mediums[0].tracks[0].title;
+  album.mediums[0].tracks[0].title;
   earliestRecord.MUSICBRAINZ_ALBUMARTISTID = album.artists[0].id;
   earliestRecord.MUSICBRAINZ_TRACKID = album.mediums[0].tracks[0].id;
   earliestRecord.MUSICBRAINZ_ALBUMID = album.id;
