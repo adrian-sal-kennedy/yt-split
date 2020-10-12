@@ -29,7 +29,7 @@ then
 cat "$file" | jq '.description' | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}' | awk "$awky" | filename=\"${media}\" bash > "${media%.*}.list"
 bash "${media%.*}.list" && rm "${media%.*}.list"
 else
-googresponse=$(curl "https://www.googleapis.com/youtube/v3/commentThreads?key=$(google-api-key)&textFormat=plainText&part=snippet&videoId=$(cat "$file" | jq -r '.id')&maxRes" | jq '.items[0].snippet.topLevelComment.snippet.textOriginal')
+googresponse=$(curl "https://www.googleapis.com/youtube/v3/commentThreads?key=$(google-api-key)&maxResults=100&textFormat=plainText&part=snippet&videoId=$(cat "$file" | jq -r '.id')&maxRes" | jq '.items| .[] |.snippet.topLevelComment.snippet.textOriginal')
 if [[ ! -z $(echo $googresponse | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}') ]]
 then
 echo $googresponse | sed 's/\\n/\n/g'
