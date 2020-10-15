@@ -6,18 +6,12 @@ set -o pipefail
 
 url=$1
 
-# let's support playlists at last.
-# https://www.youtube.com/watch?v=${id}
-# https://www.youtube.com/playlist?list=${id}
-# cat aceofspades.json | jq -r '.id' | while read id; do youtube-dl -x "https://www.youtube.com/watch?v=${id}"; done
-# ls | grep -E "$(cat aceofspades.json | jq -r '.id' | sed ':a;N;$!ba;s/\n/|/g')"
-
-
 if [[ "${url##*.}" == "json" ]]
 then
     filename=$(cat "${url}" | jq -r '._filename')
 else
-    filename=$(youtube-dl --print-json --add-metadata --write-info-json -x "${url}" | jq -r '._filename')
+    youtube-dl --print-json --add-metadata --write-info-json -x "${url}" > tmpJson.json
+    filename=$(cat tmpJson.json | jq -r '._filename')
 fi
 
 # file=$(sed -e 's/^"//' -e 's/"$//' <<<$filename) # remove quotes returned by jq # made redundant by jq -r raw mode
@@ -62,8 +56,7 @@ elif [[ ! -z $(echo "$url" | grep -E "playlist\?list\=") ]]
 then
     # we have a playlist
     echo "auto-tagging a playlist"
-    ls *.opus *.m4a | grep -E "$(cat "$file" | jq -r '.id' | sed ':a;N;$!ba;s/\n/|/g')" | while read file; do echo "$file"; autotag "$file"; done
+    ls *.opus *.m4a | grep -E "$(cat tmpJson.json | jq -r '.id' | sed ':a;N;$!ba;s/\n/|/g')" | while read file; do echo "$file"; autotag "$file"; done
 fi
-#cat samplecomments.json | jq '.items[0].snippet.topLevelComment.snippet.textOriginal' | sed 's/\\n/\n/g'
 
-#curl "https://www.googleapis.com/youtube/v3/commentThreads?key=$(google-api-key)&textFormat=plainText&part=snippet&videoId=6fQ28dTEUd0&maxRes" > samplecomments.json
+# rm tmpJson.json
