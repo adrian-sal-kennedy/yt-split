@@ -1,20 +1,27 @@
 #!/bin/bash
 set -o nounset
 # set -o errexit
-set -o xtrace
+# set -o xtrace
 set -o pipefail
 
 url=$1
 
+# let's support playlists at last.
+# https://www.youtube.com/watch?v=${id}
+# https://www.youtube.com/playlist?list=${id}
+# cat aceofspades.json | jq -r '.id' | while read id; do youtube-dl -x "https://www.youtube.com/watch?v=${id}"; done
+# ls | grep -E "$(cat aceofspades.json | jq -r '.id' | sed ':a;N;$!ba;s/\n/|/g')"
+
+
 if [[ "${url##*.}" == "json" ]]
 then
-    filename=$(cat "${url}" | jq '._filename')
+    filename=$(cat "${url}" | jq -r '._filename')
 else
-    filename=$(youtube-dl --print-json --add-metadata --write-info-json -x "${url}" | jq '._filename')
+    filename=$(youtube-dl --print-json --add-metadata --write-info-json -x "${url}" | jq -r '._filename')
 fi
 
-file=$(sed -e 's/^"//' -e 's/"$//' <<<$filename) # remove quotes returned by jq
-file=${file%.*}.info.json
+# file=$(sed -e 's/^"//' -e 's/"$//' <<<$filename) # remove quotes returned by jq # made redundant by jq -r raw mode
+file=${filename%.*}.info.json
 
 escapedFile=$(echo $file | sed -e ':t;N;s/\n/\\n/;bt' | sed 's/\([ \o47()"&;\\]\)/\\\1/g;s/\o15/\\r/g' | sed 's/\([][}{]\)/\\\1/g')
 
@@ -22,26 +29,41 @@ filefind=$(find -iname "${escapedFile%%.*}.*" -not -iname "*.pt*" | grep -i "\.o
 media=${filefind#./}
 echo media: $media
 
-awky='BEGIN{ partnumber=0} /^[0-9]/ { a= $1; if(b!="") printf "echo ffmpeg -i ${filename} -ss %1s -to %1s -c: copy ${filename%%.*}.pt%03d.${filename##*.}\n",b,a,partnumber ; b=a; partnumber+=1 } END{ printf "echo ffmpeg -i ${filename} -ss %1s -c: copy -map_metadata -1 ${filename%%.*}.pt%03d.${filename##*.}\n",b,partnumber}'
+awkCmd='BEGIN{ partnumber=0} /^[0-9]/ { a= $1; if(b!="") printf "echo ffmpeg -n -i ${filename} -ss %1s -to %1s -c: copy ${filename%%.*}.pt%03d.${filename##*.}\n",b,a,partnumber ; b=a; partnumber+=1 } END{ printf "echo ffmpeg -n -i ${filename} -ss %1s -c: copy -map_metadata -1 ${filename%%.*}.pt%03d.${filename##*.} 2>/dev/null \n",b,partnumber}'
 
-if [[ ! -z $(cat "$file" | jq '.description' | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}') ]]
+if [[ ! -z $(echo "$url" | grep -E "watch\?v\=") ]] || [[ "${url##*.}" == "json" ]]
+# if we are one file or several, an album or a playlist
 then
-cat "$file" | jq '.description' | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}' | awk "$awky" | filename=\"${media}\" bash > "${media%.*}.list"
-bash "${media%.*}.list" && rm "${media%.*}.list"
-else
-googresponse=$(curl "https://www.googleapis.com/youtube/v3/commentThreads?key=$(google-api-key)&order=relevance&maxResults=10&textFormat=plainText&part=snippet&videoId=$(cat "$file" | jq -r '.id')&maxRes" | jq '.items| .[] |.snippet.topLevelComment.snippet.textOriginal')
-if [[ ! -z $(echo $googresponse | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}') ]]
+    if [[ ! -z $(cat "$file" | jq '.description' | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}') ]]
+    # if description field is a list of timecodes
+    then
+        echo "using timecodes from youtube .description field"
+        cat "$file" | jq '.description' | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}' | awk "$awkCmd" | filename=\"${media}\" bash > "${media%.*}.list"
+        bash "${media%.*}.list" && rm "${media%.*}.list"
+    else
+        echo "trying relevant comments thread for timecodes"
+        googresponse=$(curl "https://www.googleapis.com/youtube/v3/commentThreads?key=$(google-api-key)&order=relevance&maxResults=10&textFormat=plainText&part=snippet&videoId=$(cat "$file" | jq -r '.id')&maxRes" | jq '.items| .[] |.snippet.topLevelComment.snippet.textOriginal')
+        if [[ ! -z $(echo $googresponse | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}') ]]
+        then
+            echo "using relevant comment for timecodes"
+            echo $googresponse | sed 's/\\n/\n/g'
+            echo $googresponse | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}' | awk "$awkCmd" | filename=\"${media}\" bash > "${media%.*}.list"
+            bash "${media%.*}.list" && rm "${media%.*}.list"
+        else
+            echo "FALLBACK: using ffmpeg to detect silence between tracks."
+            echo "this probably will not work."
+            echo "splitting by silence..."
+            split-by-silence "${media}" -96
+        fi
+    fi
+    echo find -maxdepth 1 -iname \"${escapedFile%%.*}.pt*\" \| sort \| while read file\; do echo \"$file\"; autotag \"$file\"\; done
+    find -maxdepth 1 -iname "${escapedFile%%.*}.pt*" | sort | while read file; do echo "$file"; autotag "$file"; done
+elif [[ ! -z $(echo "$url" | grep -E "playlist\?list\=") ]]
 then
-echo $googresponse | sed 's/\\n/\n/g'
-echo $googresponse | sed 's/\\n/\n/g' | grep -o '[0-9:]\{2\}*[0-9]\{1\}*\:[0-9]\{2\}' | awk "$awky" | filename=\"${media}\" bash > "${media%.*}.list"
-bash "${media%.*}.list" && rm "${media%.*}.list"
-else
-echo "splitting by silence..."
-split-by-silence "${media}" -96
+    # we have a playlist
+    echo "auto-tagging a playlist"
+    ls *.opus *.m4a | grep -E "$(cat "$file" | jq -r '.id' | sed ':a;N;$!ba;s/\n/|/g')" | while read file; do echo "$file"; autotag "$file"; done
 fi
-fi
-find -iname "${media%.*}.pt*" | sort | while read file; do echo "$file"; autotag "$file"; done
-
 #cat samplecomments.json | jq '.items[0].snippet.topLevelComment.snippet.textOriginal' | sed 's/\\n/\n/g'
 
 #curl "https://www.googleapis.com/youtube/v3/commentThreads?key=$(google-api-key)&textFormat=plainText&part=snippet&videoId=6fQ28dTEUd0&maxRes" > samplecomments.json
