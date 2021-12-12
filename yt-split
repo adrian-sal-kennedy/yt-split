@@ -10,7 +10,7 @@ if [[ "${url##*.}" == "json" ]]
 then
     filename=$(cat "${url}" | jq -r '._filename')
 else
-    yt-dlp -j --embed-metadata --write-info-json -x "${url}" > tmpJson.json
+    yt-dlp -j --embed-metadata --write-info-json --no-simulate --progress -x "${url}" > tmpJson.json
     filename=$(cat tmpJson.json | jq -r '._filename')
 fi
 
