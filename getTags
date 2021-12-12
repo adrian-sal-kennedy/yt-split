@@ -176,7 +176,7 @@ const ffmpegCli = (tags) => {
   } - ${tags.ALBUM.toString().replace(
     /[\\|/]/g,
     "_"
-  )}" && ffmpeg -n -i "${filename}" -map_metadata -1 -c:a copy ${string} "./${tags.ARTIST.toString().replace(
+  )}" && ffmpeg -n -i "${filename}" -map 0:a -map_metadata -1 -c:a copy ${string} "./${tags.ARTIST.toString().replace(
     /[\\|/]/g,
     "_"
   )} - ${tags.ORIGINALYEAR} - ${tags.ALBUM.toString().replace(
